@@ -69,7 +69,7 @@ static bool do_disable_hotplug = false;
 static bool do_hotplug_out = false;
 static int big_hotpluged = 0;
 static int little_hotplug_in = 0;
-#define DEFAULT_NR_RUN_THRESHD	5
+#define DEFAULT_NR_RUN_THRESHD	200
 #define DEFAULT_NR_RUN_RANGE	2
 static unsigned int nr_running_threshold = DEFAULT_NR_RUN_THRESHD;
 static unsigned int nr_running_range = DEFAULT_NR_RUN_RANGE;
@@ -902,7 +902,8 @@ static struct notifier_block exynos_dm_hotplug_reboot_nb = {
 #ifdef CONFIG_SCHED_HMP
 static void update_nr_running_count(void)
 {
-	cur_nr_running = nr_running();
+	int ret = 0;
+	cur_nr_running = (avg_nr_running() * 100) >> FSHIFT;
 
 	if (cur_nr_running >= nr_running_threshold) {
 		if (nr_running_count < nr_running_range)
@@ -914,13 +915,15 @@ static void update_nr_running_count(void)
 
 	if (nr_running_count) {
 		if (!little_in_by_nr_running) {
-			little_core1_hotplug_in(true);
-			little_in_by_nr_running = true;
+			ret = little_core1_hotplug_in(true);
+			if (!ret)
+				little_in_by_nr_running = true;
 		}
 	} else {
 		if (little_in_by_nr_running) {
-			little_core1_hotplug_in(false);
-			little_in_by_nr_running = false;
+			ret = little_core1_hotplug_in(false);
+			if (!ret)
+				little_in_by_nr_running = false;
 		}
 	}
 }
