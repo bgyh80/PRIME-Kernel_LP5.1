@@ -644,7 +644,7 @@ static bool sec_bat_ovp_uvlo_result(
 			break;
 		case POWER_SUPPLY_HEALTH_OVERVOLTAGE:
 		case POWER_SUPPLY_HEALTH_UNDERVOLTAGE:
-			dev_info(battery->dev,
+			dev_dbg(battery->dev,
 				"%s: Unsafe voltage (%d)\n",
 				__func__, health);
 			battery->status =
@@ -720,7 +720,7 @@ static bool sec_bat_check_recharge(struct sec_battery_info *battery)
 			(battery->pdata->full_condition_type &
 			 SEC_BATTERY_FULL_CONDITION_NOTIMEFULL) &&
 			(battery->charging_mode == SEC_BATTERY_CHARGING_NONE)) {
-		dev_info(battery->dev,
+		dev_dbg(battery->dev,
 				"%s: Re-charging by NOTIMEFULL (%d)\n",
 				__func__, battery->capacity);
 		goto check_recharge_check_count;
@@ -818,7 +818,7 @@ static bool sec_bat_voltage_check(struct sec_battery_info *battery)
 			battery->voltage_now = 1080;
 			battery->voltage_avg = 1080;
 			power_supply_changed(&battery->psy_bat);
-			dev_info(battery->dev,
+			dev_dbg(battery->dev,
 				"%s: battery status full -> charging, RepSOC(%d)\n", __func__, value.intval);
 			return false;
 		}
@@ -1626,7 +1626,7 @@ static void sec_bat_do_test_function(
 			}
 			break;
 		default:
-			pr_info("%s: error test: unknown state\n", __func__);
+			pr_debug("%s: error test: unknown state\n", __func__);
 			break;
 	}
 }
@@ -2001,7 +2001,7 @@ static void sec_bat_chg_temperature_check(
 			value.intval = battery->pdata->chg_charging_limit_current;
 			psy_do_property(battery->pdata->charger_name, set,
 					POWER_SUPPLY_PROP_CURRENT_MAX, value);
-			dev_info(battery->dev,"%s: Chg current is reduced by Temp: %d\n",
+			dev_dbg(battery->dev,"%s: Chg current is reduced by Temp: %d\n",
 					__func__, battery->chg_temp);
 		} else if ((battery->chg_limit == SEC_BATTERY_CHG_TEMP_HIGH_1ST) &&
 				(battery->pre_chg_temp < battery->pdata->chg_high_temp_2nd) &&
@@ -2010,7 +2010,7 @@ static void sec_bat_chg_temperature_check(
 			value.intval = battery->pdata->chg_charging_limit_current_2nd;
 			psy_do_property(battery->pdata->charger_name, set,
 					POWER_SUPPLY_PROP_CURRENT_MAX, value);
-			dev_info(battery->dev,"%s: Chg current 2nd is reduced by Temp: %d\n",
+			dev_dbg(battery->dev,"%s: Chg current 2nd is reduced by Temp: %d\n",
 					__func__, battery->chg_temp);
 		} else if ((battery->chg_limit != SEC_BATTERY_CHG_TEMP_NONE) &&
 				(battery->chg_temp < battery->pdata->chg_high_temp_recovery)) {
@@ -2019,7 +2019,7 @@ static void sec_bat_chg_temperature_check(
 				[battery->cable_type].input_current_limit;
 			psy_do_property(battery->pdata->charger_name, set,
 					POWER_SUPPLY_PROP_CURRENT_MAX, value);
-			dev_info(battery->dev,"%s: Chg current is recovered by Temp: %d\n",
+			dev_dbg(battery->dev,"%s: Chg current is recovered by Temp: %d\n",
 					__func__, battery->chg_temp);
 		}
 	} else if (battery->chg_limit != SEC_BATTERY_CHG_TEMP_NONE) {
@@ -2311,7 +2311,7 @@ static void sec_bat_swelling_fullcharged_check(struct sec_battery_info *battery)
 
 	if (value.intval == POWER_SUPPLY_STATUS_FULL) {
 		battery->swelling_full_check_cnt++;
-		pr_info("%s: Swelling mode full-charged check (%d)\n",
+		pr_debug("%s: Swelling mode full-charged check (%d)\n",
 			__func__, battery->swelling_full_check_cnt);
 	} else
 		battery->swelling_full_check_cnt = 0;
@@ -2427,7 +2427,7 @@ static void sec_bat_monitor_work(
 
 continue_monitor:
 #if defined(CONFIG_AFC_CHARGER_MODE)
-	dev_info(battery->dev,
+	dev_dbg(battery->dev,
 		 "%s: Status(%s), mode(%s), Health(%s), Cable(%d), level(%d%%), HV(%s)\n",
 		 __func__,
 		 sec_bat_status_str[battery->status],
@@ -2436,7 +2436,7 @@ continue_monitor:
 		 battery->cable_type, battery->siop_level,
 		 battery->hv_chg_name);
 #else
-	dev_info(battery->dev,
+	dev_dbg(battery->dev,
 		 "%s: Status(%s), mode(%s), Health(%s), Cable(%d), level(%d%%)\n",
 		 __func__,
 		 sec_bat_status_str[battery->status],
@@ -2515,7 +2515,7 @@ static void sec_bat_cable_work(struct work_struct *work)
 	union power_supply_propval val;
 	int wl_cur, wr_cur, current_cable_type;
 
-	dev_info(battery->dev, "%s: Start\n", __func__);
+	dev_dbg(battery->dev, "%s: Start\n", __func__);
 
 	wl_cur = battery->pdata->charging_current[
 		POWER_SUPPLY_TYPE_WIRELESS].input_current_limit;
@@ -2624,14 +2624,14 @@ static void sec_bat_cable_work(struct work_struct *work)
 	battery->polling_in_sleep = false;
 	sec_bat_get_polling_time(battery);
 
-	dev_info(battery->dev,
+	dev_dbg(battery->dev,
 		"%s: Status:%s, Sleep:%s, Charging:%s, Short Poll:%s\n",
 		__func__, sec_bat_status_str[battery->status],
 		battery->polling_in_sleep ? "Yes" : "No",
 		(battery->charging_mode ==
 		SEC_BATTERY_CHARGING_NONE) ? "No" : "Yes",
 		battery->polling_short ? "Yes" : "No");
-	dev_info(battery->dev,
+	dev_dbg(battery->dev,
 		"%s: Polling time is reset to %d sec.\n", __func__,
 		battery->polling_time);
 
@@ -2975,7 +2975,7 @@ ssize_t sec_bat_show_attrs(struct device *dev,
 #endif
 	case BATT_INBAT_VOLTAGE:
 		ret = sec_bat_get_inbat_vol_by_adc(battery);
-		dev_info(battery->dev, "in-battery voltage(%d)\n", ret);
+		dev_dbg(battery->dev, "in-battery voltage(%d)\n", ret);
 		i += scnprintf(buf + i, PAGE_SIZE - i, "%d\n",
 				ret);
 		break;
@@ -3053,7 +3053,7 @@ ssize_t sec_bat_store_attrs(
 				SEC_FUELGAUGE_CAPACITY_TYPE_RESET;
 			psy_do_property(battery->pdata->fuelgauge_name, set,
 					POWER_SUPPLY_PROP_CAPACITY, value);
-			dev_info(battery->dev,"do reset SOC\n");
+			dev_dbg(battery->dev,"do reset SOC\n");
 			/* update battery info */
 			sec_bat_get_battery_info(battery);
 		}
@@ -3103,7 +3103,7 @@ ssize_t sec_bat_store_attrs(
 				value.intval = POWER_SUPPLY_TYPE_USB;
 				battery->slate_mode = false;
 			} else {
-				dev_info(battery->dev,
+				dev_dbg(battery->dev,
 					"%s: SLATE MODE unknown command\n",
 					__func__);
 				return -EINVAL;
@@ -3171,7 +3171,7 @@ ssize_t sec_bat_store_attrs(
 			} else if (x == 1) {
 				battery->wc_enable = true;
 			} else {
-				dev_info(battery->dev,
+				dev_dbg(battery->dev,
 					"%s: WPC ENABLE unknown command\n",
 					__func__);
 				return -EINVAL;
@@ -3303,9 +3303,9 @@ ssize_t sec_bat_store_attrs(
 	case BATT_TEMP_TABLE:
 		if (sscanf(buf, "%d %d %d %d %d %d %d %d %d %d %d %d\n",
 			&t[0], &t[1], &t[2], &t[3], &t[4], &t[5], &t[6], &t[7], &t[8], &t[9], &t[10], &t[11]) == 12) {
-			pr_info("%s: (new) %d %d %d %d %d %d %d %d %d %d %d %d\n",
+			pr_debug("%s: (new) %d %d %d %d %d %d %d %d %d %d %d %d\n",
 				__func__, t[0], t[1], t[2], t[3], t[4], t[5], t[6], t[7], t[8], t[9], t[10], t[11]);
-			pr_info("%s: (default) %d %d %d %d %d %d %d %d %d %d %d %d\n",
+			pr_debug("%s: (default) %d %d %d %d %d %d %d %d %d %d %d %d\n",
 				__func__,
 				battery->pdata->temp_high_threshold_event,
 				battery->pdata->temp_high_recovery_event,
@@ -3509,7 +3509,7 @@ static int sec_bat_set_property(struct power_supply *psy,
 			break;
 
 		if (current_cable_type < 0) {
-			dev_info(battery->dev,
+			dev_dbg(battery->dev,
 					"%s: ignore event(%d)\n",
 					__func__, current_cable_type);
 		} else if (current_cable_type == POWER_SUPPLY_TYPE_OTG) {
@@ -3527,7 +3527,7 @@ static int sec_bat_set_property(struct power_supply *psy,
 					&& battery->wc_status)
 				current_cable_type = POWER_SUPPLY_TYPE_WIRELESS;
 		}
-		dev_info(battery->dev,
+		dev_dbg(battery->dev,
 				"%s: current_cable(%d), wc_status(%d), wire_status(%d)\n",
 				__func__, current_cable_type, battery->wc_status,
 				battery->wire_status);
@@ -3921,7 +3921,7 @@ static int sec_ps_get_property(struct power_supply *psy,
 		} else {
 			if (battery->ps_enable == true) {
 				battery->ps_enable = false;
-				dev_info(battery->dev,
+				dev_dbg(battery->dev,
 					"%s: power sharing cable disconnected! ps disable (%d)\n",
 					__func__, battery->ps_enable);
 
@@ -3945,7 +3945,7 @@ static irqreturn_t sec_bat_irq_thread(int irq, void *irq_data)
 {
 	struct sec_battery_info *battery = irq_data;
 
-	dev_info(battery->dev, "%s:(bat_irq occured_start\n", __func__);
+	dev_dbg(battery->dev, "%s:(bat_irq occured_start\n", __func__);
 
 	if (battery->pdata->cable_check_type &
 		SEC_BATTERY_CABLE_CHECK_INT) {
@@ -3984,7 +3984,7 @@ static int sec_bat_cable_check(struct sec_battery_info *battery,
 	int current_cable_type = -1;
 	union power_supply_propval val;
 
-	pr_info("[%s]ATTACHED(%d)\n", __func__, attached_dev);
+	pr_debug("[%s]ATTACHED(%d)\n", __func__, attached_dev);
 
 	switch (attached_dev)
 	{
@@ -4110,14 +4110,14 @@ static int batt_handle_notification(struct notifier_block *nb,
 	}
 
 	if (cable_type < 0) {
-		dev_info(battery->dev, "%s: ignore event(%d)\n",
+		dev_dbg(battery->dev, "%s: ignore event(%d)\n",
 			__func__, cable_type);
 	} else if (cable_type == POWER_SUPPLY_TYPE_POWER_SHARING) {
 		battery->ps_status = true;
 		battery->ps_enable = true;
 		battery->ps_changed = true;
 
-		dev_info(battery->dev,
+		dev_dbg(battery->dev,
 			"%s: power sharing cable plugin (%d)\n", __func__, battery->ps_status);
 	} else if (cable_type == POWER_SUPPLY_TYPE_WIRELESS) {
 		battery->wc_status = true;
@@ -4134,7 +4134,7 @@ static int batt_handle_notification(struct notifier_block *nb,
 		battery->cable_type = cable_type;
 		wake_lock(&battery->monitor_wake_lock);
 		queue_delayed_work_on(0, battery->monitor_wqueue, &battery->monitor_work, 0);
-		dev_info(battery->dev,
+		dev_dbg(battery->dev,
 			"%s: UNKNOWN cable plugin\n", __func__);
 		return 0;
 	} else {
@@ -4143,7 +4143,7 @@ static int batt_handle_notification(struct notifier_block *nb,
 				&& battery->wc_status && !battery->ps_status)
 			cable_type = POWER_SUPPLY_TYPE_WIRELESS;
 	}
-	dev_info(battery->dev,
+	dev_dbg(battery->dev,
 			"%s: current_cable(%d), wc_status(%d), wire_status(%d)\n",
 			__func__, cable_type, battery->wc_status,
 			battery->wire_status);
@@ -4173,14 +4173,14 @@ static int batt_handle_notification(struct notifier_block *nb,
 			psy_do_property(battery->pdata->charger_name, set,
 					POWER_SUPPLY_PROP_CHARGE_POWERED_OTG_CONTROL,
 					value);
-			dev_info(battery->dev,
+			dev_dbg(battery->dev,
 				"%s: Powered OTG cable attached\n", __func__);
 		} else {
 			value.intval = false;
 			psy_do_property(battery->pdata->charger_name, set,
 					POWER_SUPPLY_PROP_CHARGE_POWERED_OTG_CONTROL,
 					value);
-			dev_info(battery->dev,
+			dev_dbg(battery->dev,
 				"%s: Powered OTG cable detached\n", __func__);
 		}
 	} else if ((attached_dev == ATTACHED_DEV_VZW_ACC_MUIC) &&
@@ -4206,7 +4206,7 @@ static int batt_handle_notification(struct notifier_block *nb,
 			battery->hv_chg_name = "NONE";
 	}
 
-	pr_info("%s : HV_CHARGER_NAME(%s)\n",
+	pr_debug("%s : HV_CHARGER_NAME(%s)\n",
 		__func__, battery->hv_chg_name);
 #endif
 
@@ -4219,7 +4219,7 @@ static int batt_handle_notification(struct notifier_block *nb,
 		} else if((cable_type == POWER_SUPPLY_TYPE_BATTERY)
 					&& battery->ps_status) {
 			battery->ps_status = false;
-			dev_info(battery->dev,
+			dev_dbg(battery->dev,
 				"%s: power sharing cable plugout (%d)\n", __func__, battery->ps_status);
 			wake_lock(&battery->monitor_wake_lock);
 			queue_delayed_work_on(0, battery->monitor_wqueue, &battery->monitor_work, 0);
@@ -4228,13 +4228,13 @@ static int batt_handle_notification(struct notifier_block *nb,
 			queue_work(battery->monitor_wqueue,
 				   &battery->cable_work);
 		} else {
-			dev_info(battery->dev,
+			dev_dbg(battery->dev,
 				"%s: Cable is Not Changed(%d)\n",
 				__func__, battery->cable_type);
 		}
 	}
 
-	pr_info("%s: CMD=%s, attached_dev=%d\n", __func__, cmd, attached_dev);
+	pr_debug("%s: CMD=%s, attached_dev=%d\n", __func__, cmd, attached_dev);
 
 	return 0;
 }
@@ -4254,34 +4254,34 @@ static int sec_bat_parse_dt(struct device *dev,
 #endif
 
 	if (!np) {
-		pr_info("%s: np NULL\n", __func__);
+		pr_debug("%s: np NULL\n", __func__);
 		return 1;
 	}
 
 	ret = of_property_read_string(np,
 		"battery,vendor", (char const **)&pdata->vendor);
 	if (ret)
-		pr_info("%s: Vendor is Empty\n", __func__);
+		pr_debug("%s: Vendor is Empty\n", __func__);
 
 	ret = of_property_read_string(np,
 		"battery,charger_name", (char const **)&pdata->charger_name);
 	if (ret)
-		pr_info("%s: Vendor is Empty\n", __func__);
+		pr_debug("%s: Vendor is Empty\n", __func__);
 
 	ret = of_property_read_string(np,
 		"battery,fuelgauge_name", (char const **)&pdata->fuelgauge_name);
 	if (ret)
-		pr_info("%s: Vendor is Empty\n", __func__);
+		pr_debug("%s: Vendor is Empty\n", __func__);
 
 	ret = of_property_read_string(np,
 		"battery,chip_vendor", (char const **)&pdata->chip_vendor);
 	if (ret)
-		pr_info("%s: Vendor is Empty\n", __func__);
+		pr_debug("%s: Vendor is Empty\n", __func__);
 
 	ret = of_property_read_u32(np, "battery,technology",
 		&pdata->technology);
 	if (ret)
-		pr_info("%s : technology is Empty\n", __func__);
+		pr_debug("%s : technology is Empty\n", __func__);
 
 	p = of_get_property(np, "battery,polling_time", &len);
 	if (!p)
@@ -4295,7 +4295,7 @@ static int sec_bat_parse_dt(struct device *dev,
 	ret = of_property_read_u32(np, "battery,thermal_source",
 		&pdata->thermal_source);
 	if (ret)
-		pr_info("%s : Thermal source is Empty\n", __func__);
+		pr_debug("%s : Thermal source is Empty\n", __func__);
 
 	if (pdata->thermal_source == SEC_BATTERY_THERMAL_SOURCE_ADC) {
 		p = of_get_property(np, "battery,temp_table_adc", &len);
@@ -4319,28 +4319,28 @@ static int sec_bat_parse_dt(struct device *dev,
 					 "battery,temp_table_adc", i,
 					 &pdata->temp_adc_table[i].adc);
 			if (ret)
-				pr_info("%s : Temp_adc_table(adc) is Empty\n",
+				pr_debug("%s : Temp_adc_table(adc) is Empty\n",
 					__func__);
 
 			ret = of_property_read_u32_index(np,
 					 "battery,temp_table_data", i,
 					 &pdata->temp_adc_table[i].data);
 			if (ret)
-				pr_info("%s : Temp_adc_table(data) is Empty\n",
+				pr_debug("%s : Temp_adc_table(data) is Empty\n",
 					__func__);
 
 			ret = of_property_read_u32_index(np,
 					 "battery,temp_table_adc", i,
 					 &pdata->temp_amb_adc_table[i].adc);
 			if (ret)
-				pr_info("%s : Temp_amb_adc_table(adc) is Empty\n",
+				pr_debug("%s : Temp_amb_adc_table(adc) is Empty\n",
 					__func__);
 
 			ret = of_property_read_u32_index(np,
 					 "battery,temp_table_data", i,
 					 &pdata->temp_amb_adc_table[i].data);
 			if (ret)
-				pr_info("%s : Temp_amb_adc_table(data) is Empty\n",
+				pr_debug("%s : Temp_amb_adc_table(data) is Empty\n",
 					__func__);
 		}
 	}
@@ -4348,33 +4348,33 @@ static int sec_bat_parse_dt(struct device *dev,
 	ret = of_property_read_u32(np, "battery,chg_temp_check",
 		&pdata->chg_temp_check);
 	if (ret)
-		pr_info("%s : chg_temp_check is Empty\n", __func__);
+		pr_debug("%s : chg_temp_check is Empty\n", __func__);
 
 	if (pdata->chg_temp_check) {
 		ret = of_property_read_u32(np, "battery,chg_high_temp_1st",
 				&pdata->chg_high_temp_1st);
 		if (ret)
-			pr_info("%s : chg_high_temp_threshold is Empty\n", __func__);
+			pr_debug("%s : chg_high_temp_threshold is Empty\n", __func__);
 
 		ret = of_property_read_u32(np, "battery,chg_high_temp_2nd",
 				&pdata->chg_high_temp_2nd);
 		if (ret)
-			pr_info("%s : chg_high_temp_threshold is Empty\n", __func__);
+			pr_debug("%s : chg_high_temp_threshold is Empty\n", __func__);
 
 		ret = of_property_read_u32(np, "battery,chg_high_temp_recovery",
 					   &pdata->chg_high_temp_recovery);
 		if (ret)
-			pr_info("%s : chg_temp_recovery is Empty\n", __func__);
+			pr_debug("%s : chg_temp_recovery is Empty\n", __func__);
 
 		ret = of_property_read_u32(np, "battery,chg_charging_limit_current",
 					   &pdata->chg_charging_limit_current);
 		if (ret)
-			pr_info("%s : chg_charging_limit_current is Empty\n", __func__);
+			pr_debug("%s : chg_charging_limit_current is Empty\n", __func__);
 
 		ret = of_property_read_u32(np, "battery,chg_charging_limit_current_2nd",
 					   &pdata->chg_charging_limit_current_2nd);
 		if (ret)
-			pr_info("%s : chg_charging_limit_current_2nd is Empty\n", __func__);
+			pr_debug("%s : chg_charging_limit_current_2nd is Empty\n", __func__);
 
 		p = of_get_property(np, "battery,chg_temp_table_adc", &len);
 		if (!p)
@@ -4393,14 +4393,14 @@ static int sec_bat_parse_dt(struct device *dev,
 							 "battery,chg_temp_table_adc", i,
 							 &pdata->chg_temp_adc_table[i].adc);
 			if (ret)
-				pr_info("%s : CHG_Temp_adc_table(adc) is Empty\n",
+				pr_debug("%s : CHG_Temp_adc_table(adc) is Empty\n",
 					__func__);
 
 			ret = of_property_read_u32_index(np,
 							 "battery,chg_temp_table_data", i,
 							 &pdata->chg_temp_adc_table[i].data);
 			if (ret)
-				pr_info("%s : CHG_Temp_adc_table(data) is Empty\n",
+				pr_debug("%s : CHG_Temp_adc_table(data) is Empty\n",
 					__func__);
 		}
 	}
@@ -4408,7 +4408,7 @@ static int sec_bat_parse_dt(struct device *dev,
 	ret = of_property_read_u32(np, "battery,inbat_voltage",
 			&pdata->inbat_voltage);
 	if (ret)
-		pr_info("%s : inbat_voltage is Empty\n", __func__);
+		pr_debug("%s : inbat_voltage is Empty\n", __func__);
 
 	if (pdata->inbat_voltage) {
 		p = of_get_property(np, "battery,inbat_voltage_table_adc", &len);
@@ -4428,14 +4428,14 @@ static int sec_bat_parse_dt(struct device *dev,
 					"battery,inbat_voltage_table_adc", i,
 					&pdata->inbat_adc_table[i].adc);
 			if (ret)
-				pr_info("%s : inbat_adc_table(adc) is Empty\n",
+				pr_debug("%s : inbat_adc_table(adc) is Empty\n",
 						__func__);
 
 			ret = of_property_read_u32_index(np,
 					"battery,inbat_voltage_table_data", i,
 					&pdata->inbat_adc_table[i].data);
 			if (ret)
-				pr_info("%s : inbat_adc_table(data) is Empty\n",
+				pr_debug("%s : inbat_adc_table(data) is Empty\n",
 						__func__);
 		}
 	}
@@ -4875,7 +4875,7 @@ static void cable_initial_check(struct sec_battery_info *battery)
 {
 	union power_supply_propval value;
 
-	pr_info("%s : current_cable_type : (%d)\n", __func__, battery->cable_type);
+	pr_debug("%s : current_cable_type : (%d)\n", __func__, battery->cable_type);
 
 	if (battery->cable_type == POWER_SUPPLY_TYPE_BATTERY) {
 		psy_do_property(battery->pdata->charger_name, get,
@@ -5210,7 +5210,7 @@ static int __devinit sec_battery_probe(struct platform_device *pdev)
 	if (battery->pdata->check_battery_callback)
 		battery->present = battery->pdata->check_battery_callback();
 
-	dev_info(battery->dev,
+	dev_dbg(battery->dev,
 		"%s: SEC Battery Driver Loaded\n", __func__);
 	return 0;
 
