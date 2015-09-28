@@ -7032,7 +7032,7 @@ static int hmp_packing_ilb_needed(int cpu, int ilb_needed)
 		return ilb_needed;
 
 	/* if disabled, use normal ILB behaviour */
-	if (!hmp_packing_enable())
+	if (!hmp_packing_enabled)
 		return ilb_needed;
 
 	hmp = hmp_cpu_domain(cpu);
