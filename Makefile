@@ -385,7 +385,9 @@ KBUILD_CFLAGS   := -Wall -Wundef -Wstrict-prototypes -Wno-trigraphs \
 		   -Wno-discarded-array-qualifiers -Wno-logical-not-parentheses \
 		   -Wno-array-bounds -Wno-switch -munaligned-access \
 		   -fno-delete-null-pointer-checks \
-		   -fdiagnostics-show-option -Werror
+		   -fdiagnostics-show-option -Werror \
+		   -march=armv8-a+crc
+#		   -mtune=cortex-a53
 
 KBUILD_AFLAGS_KERNEL :=
 KBUILD_CFLAGS_KERNEL :=
