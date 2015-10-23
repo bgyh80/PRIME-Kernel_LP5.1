@@ -472,14 +472,23 @@ void tune_lmk_param(int *other_free, int *other_file, struct shrink_control *sc)
 	}
 }
 
-static int lowmem_shrink(struct shrinker *s, struct shrink_control *sc)
+static unsigned long lowmem_count(struct shrinker *s,
+				  struct shrink_control *sc)
+{
+	return global_page_state(NR_ACTIVE_ANON) +
+		global_page_state(NR_ACTIVE_FILE) +
+		global_page_state(NR_INACTIVE_ANON) +
+		global_page_state(NR_INACTIVE_FILE);
+}
+
+static unsigned long lowmem_scan(struct shrinker *s, struct shrink_control *sc)
 {
 	struct task_struct *tsk;
 	struct task_struct *selected[MANAGED_PROCESS_TYPES] = {NULL};
-	int rem = 0;
-	int ret = 0;
+	unsigned long rem = 0;
 	int tasksize;
 	int i;
+	int ret = 0;
 	short min_score_adj = OOM_SCORE_ADJ_MAX + 1;
 	int minfree = 0;
 	enum lowmem_process_type proc_type = KILLABLE_PROCESS;
@@ -515,20 +524,14 @@ static int lowmem_shrink(struct shrinker *s, struct shrink_control *sc)
 			break;
 		}
 	}
-	if (sc->nr_to_scan > 0) {
-		ret = adjust_minadj(&min_score_adj);
-		lowmem_print(3, "lowmem_shrink %lu, %x, ofree %d %d, ma %hd\n",
-				sc->nr_to_scan, sc->gfp_mask, other_free,
-				other_file, min_score_adj);
-	}
+	ret = adjust_minadj(&min_score_adj);
+	lowmem_print(3, "lowmem_shrink %lu, %x, ofree %d %d, ma %hd\n",
+			nr_to_scan, sc->gfp_mask, other_free,
+			other_file, min_score_adj);
 
-	rem = global_page_state(NR_ACTIVE_ANON) +
-		global_page_state(NR_ACTIVE_FILE) +
-		global_page_state(NR_INACTIVE_ANON) +
-		global_page_state(NR_INACTIVE_FILE);
-	if (nr_to_scan <= 0 || min_score_adj == OOM_SCORE_ADJ_MAX + 1) {
-		lowmem_print(5, "lowmem_shrink %lu, %x, return %d\n",
-			     nr_to_scan, sc->gfp_mask, rem);
+	if (min_score_adj == OOM_SCORE_ADJ_MAX + 1) {
+		lowmem_print(5, "lowmem_shrink %lu, %x, return 0\n",
+			     nr_to_scan, sc->gfp_mask);
 
 		if (nr_to_scan > 0)
 			mutex_unlock(&scan_mutex);
@@ -664,7 +667,7 @@ static int lowmem_shrink(struct shrinker *s, struct shrink_control *sc)
 			lowmem_deathpending_timeout = jiffies + HZ;
 			send_sig(SIGKILL, selected[proc_type], 0);
 			set_tsk_thread_flag(selected[proc_type], TIF_MEMDIE);
-			rem -= selected_tasksize[proc_type];
+			rem += selected_tasksize[proc_type];
 	 		rcu_read_unlock();
 			lmk_count++;
 	 		/* give the system time to free up the memory */
@@ -678,14 +681,15 @@ static int lowmem_shrink(struct shrinker *s, struct shrink_control *sc)
 	 	}
 	}
 
-	lowmem_print(4, "lowmem_shrink %lu, %x, return %d\n",
+	lowmem_print(4, "lowmem_scan %lu, %x, return %ld\n",
 		     nr_to_scan, sc->gfp_mask, rem);
 	mutex_unlock(&scan_mutex);
 	return rem;
 }
 
 static struct shrinker lowmem_shrinker = {
-	.shrink = lowmem_shrink,
+	.scan_objects = lowmem_scan,
+	.count_objects = lowmem_count,
 	.seeks = DEFAULT_SEEKS * 16
 };
 
