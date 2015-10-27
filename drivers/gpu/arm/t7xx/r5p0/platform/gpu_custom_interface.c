@@ -928,7 +928,10 @@ static ssize_t set_max_lock_dvfs(struct device *dev, struct device_attribute *at
 			return -ENOENT;
 		}
 
-		gpu_dvfs_clock_lock(GPU_DVFS_MAX_UNLOCK, SYSFS_LOCK, 0);
+		if (clock == platform->gpu_max_clock)
+			gpu_dvfs_clock_lock(GPU_DVFS_MAX_UNLOCK, SYSFS_LOCK, 0);
+		else
+			gpu_dvfs_clock_lock(GPU_DVFS_MAX_LOCK, SYSFS_LOCK, clock);
 	}
 
 	return count;
