@@ -576,13 +576,6 @@ config BALANCE_ANON_FILE_RECLAIM
 	  Swapping anonymous pages out to memory can be efficient enough to justify
 	  treating anonymous and file backed pages equally.
 
-config ZOOM_KILLER
-	bool "Samsung extension. Selet victim who has largest lowmem with same score"
-	depends on !OOM_KILLER_TIMEOUT && !SEC_OOM_KILLER
-	default y
-	help
-	  When OOM select victim, choose process which has largest lowmem
-
 config ACCURATE_FREE_PAGES_CHECK
 	bool "Samsung WA: prevent process overkill"
 		default n

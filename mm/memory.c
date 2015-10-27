@@ -853,16 +853,8 @@ copy_one_pte(struct mm_struct *dst_mm, struct mm_struct *src_mm,
 
 				if (PageAnon(page)) {
 					rss[MM_ANONPAGES]++;
-#ifdef CONFIG_ZOOM_KILLER
-					if (!PageHighMem(page))
-						rss[MM_LOW_ANONPAGES]++;
-#endif
 				} else {
 					rss[MM_FILEPAGES]++;
-#ifdef CONFIG_ZOOM_KILLER
-					if (!PageHighMem(page))
-						rss[MM_LOW_FILEPAGES]++;
-#endif
 				}
 
 				if (is_write_migration_entry(entry) &&
@@ -903,16 +895,8 @@ copy_one_pte(struct mm_struct *dst_mm, struct mm_struct *src_mm,
 		page_dup_rmap(page);
 		if (PageAnon(page)) {
 			rss[MM_ANONPAGES]++;
-#ifdef CONFIG_ZOOM_KILLER
-			if (!PageHighMem(page))
-				rss[MM_LOW_ANONPAGES]++;
-#endif
 		} else {
 			rss[MM_FILEPAGES]++;
-#ifdef CONFIG_ZOOM_KILLER
-			if (!PageHighMem(page))
-				rss[MM_LOW_FILEPAGES]++;
-#endif
 		}
 	}
 
@@ -1165,10 +1149,6 @@ again:
 					   pgoff_to_pte(page->index));
 			if (PageAnon(page)) {
 				rss[MM_ANONPAGES]--;
-#ifdef CONFIG_ZOOM_KILLER
-				if (!PageHighMem(page))
-					rss[MM_LOW_ANONPAGES]--;
-#endif
 			} else {
 				if (pte_dirty(ptent))
 					set_page_dirty(page);
@@ -1176,10 +1156,6 @@ again:
 				    likely(!VM_SequentialReadHint(vma)))
 					mark_page_accessed(page);
 				rss[MM_FILEPAGES]--;
-#ifdef CONFIG_ZOOM_KILLER
-				if (!PageHighMem(page))
-					rss[MM_LOW_FILEPAGES]--;
-#endif
 			}
 			page_remove_rmap(page);
 			if (unlikely(page_mapcount(page) < 0))
@@ -1210,16 +1186,8 @@ again:
 
 				if (PageAnon(page)) {
 					rss[MM_ANONPAGES]--;
-#ifdef CONFIG_ZOOM_KILLER
-					if (!PageHighMem(page))
-						rss[MM_LOW_ANONPAGES]--;
-#endif
 				} else {
 					rss[MM_FILEPAGES]--;
-#ifdef CONFIG_ZOOM_KILLER
-					if (!PageHighMem(page))
-						rss[MM_LOW_FILEPAGES]--;
-#endif
 				}
 			}
 			if (unlikely(!free_swap_and_cache(entry)))
@@ -2147,10 +2115,6 @@ static int insert_page(struct vm_area_struct *vma, unsigned long addr,
 	/* Ok, finally just insert the thing.. */
 	get_page(page);
 	inc_mm_counter_fast(mm, MM_FILEPAGES);
-#ifdef CONFIG_ZOOM_KILLER
-	if (!PageHighMem(page))
-		inc_mm_counter_fast(mm, MM_LOW_FILEPAGES);
-#endif
 	page_add_file_rmap(page);
 	set_pte_at(mm, addr, pte, mk_pte(page, prot));
 
@@ -2858,24 +2822,9 @@ gotten:
 			if (!PageAnon(old_page)) {
 				dec_mm_counter_fast(mm, MM_FILEPAGES);
 				inc_mm_counter_fast(mm, MM_ANONPAGES);
-#ifdef CONFIG_ZOOM_KILLER
-				if (!PageHighMem(old_page))
-					dec_mm_counter_fast(mm, MM_LOW_FILEPAGES);
-				if (!PageHighMem(new_page))
-					inc_mm_counter_fast(mm, MM_LOW_ANONPAGES);
-			} else {
-				if(!PageHighMem(old_page) && PageHighMem(new_page))
-					dec_mm_counter_fast(mm, MM_LOW_ANONPAGES);
-				if(PageHighMem(old_page) && !PageHighMem(new_page))
-					inc_mm_counter_fast(mm, MM_LOW_ANONPAGES);
-#endif
 			}
 		} else {
 			inc_mm_counter_fast(mm, MM_ANONPAGES);
-#ifdef CONFIG_ZOOM_KILLER
-			if (!PageHighMem(new_page))
-				inc_mm_counter_fast(mm, MM_LOW_ANONPAGES);
-#endif
 		}
 		flush_cache_page(vma, address, pte_pfn(orig_pte));
 		entry = mk_pte(new_page, vma->vm_page_prot);
@@ -3186,10 +3135,6 @@ static int do_swap_page(struct mm_struct *mm, struct vm_area_struct *vma,
 	 */
 
 	inc_mm_counter_fast(mm, MM_ANONPAGES);
-#ifdef CONFIG_ZOOM_KILLER
-	if (!PageHighMem(page))
-		inc_mm_counter_fast(mm, MM_LOW_ANONPAGES);
-#endif
 	dec_mm_counter_fast(mm, MM_SWAPENTS);
 	pte = mk_pte(page, vma->vm_page_prot);
 	if ((flags & FAULT_FLAG_WRITE) && reuse_swap_page(page)) {
@@ -3339,10 +3284,6 @@ static int do_anonymous_page(struct mm_struct *mm, struct vm_area_struct *vma,
 		goto release;
 
 	inc_mm_counter_fast(mm, MM_ANONPAGES);
-#ifdef CONFIG_ZOOM_KILLER
-	if (!PageHighMem(page))
-		inc_mm_counter_fast(mm, MM_LOW_ANONPAGES);
-#endif
 	page_add_new_anon_rmap(page, vma, address);
 setpte:
 	set_pte_at(mm, address, page_table, entry);
@@ -3498,17 +3439,9 @@ static int __do_fault(struct mm_struct *mm, struct vm_area_struct *vma,
 			entry = maybe_mkwrite(pte_mkdirty(entry), vma);
 		if (anon) {
 			inc_mm_counter_fast(mm, MM_ANONPAGES);
-#ifdef CONFIG_ZOOM_KILLER
-			if (!PageHighMem(page))
-				inc_mm_counter_fast(mm, MM_LOW_ANONPAGES);
-#endif
 			page_add_new_anon_rmap(page, vma, address);
 		} else {
 			inc_mm_counter_fast(mm, MM_FILEPAGES);
-#ifdef CONFIG_ZOOM_KILLER
-			if (!PageHighMem(page))
-				inc_mm_counter_fast(mm, MM_LOW_FILEPAGES);
-#endif
 			page_add_file_rmap(page);
 			if (flags & FAULT_FLAG_WRITE) {
 				dirty_page = page;
