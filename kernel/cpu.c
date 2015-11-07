@@ -22,6 +22,7 @@
 
 #ifdef CONFIG_ARM_EXYNOS_MP_CPUFREQ
 #include <mach/cpufreq.h>
+#include <linux/cpufreq.h>
 #endif
 
 #include <linux/sec_debug.h>
