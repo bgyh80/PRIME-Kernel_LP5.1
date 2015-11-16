@@ -32,6 +32,8 @@
 #include <asm/tlbflush.h>
 #include <asm/shmparam.h>
 
+extern int boot_mode_security;
+
 struct vfree_deferred {
 	struct llist_head list;
 	struct work_struct wq;
@@ -57,11 +59,35 @@ static void vunmap_pte_range(pmd_t *pmd, unsigned long addr, unsigned long end)
 {
 	pte_t *pte;
 
+#ifdef CONFIG_TIMA_RKP_LAZY_MMU
+	unsigned long do_lazy_mmu = 0;
+#endif
+
 	pte = pte_offset_kernel(pmd, addr);
+	
+#ifdef CONFIG_TIMA_RKP_LAZY_MMU
+	if (boot_mode_security && tima_is_pg_protected((unsigned long)pte) == 1)
+		do_lazy_mmu = 1;
+	if (do_lazy_mmu) {
+		spin_lock(&init_mm.page_table_lock);
+		tima_send_cmd2((unsigned int)pmd, TIMA_LAZY_MMU_START, TIMA_LAZY_MMU_CMDID);
+		flush_tlb_l2_page(pmd);
+		spin_unlock(&init_mm.page_table_lock);
+	}
+#endif
 	do {
 		pte_t ptent = ptep_get_and_clear(&init_mm, addr, pte);
 		WARN_ON(!pte_none(ptent) && !pte_present(ptent));
 	} while (pte++, addr += PAGE_SIZE, addr != end);
+
+#ifdef CONFIG_TIMA_RKP_LAZY_MMU
+	if (do_lazy_mmu) {
+		spin_lock(&init_mm.page_table_lock);
+		tima_send_cmd2((unsigned int)pmd, TIMA_LAZY_MMU_STOP, TIMA_LAZY_MMU_CMDID);
+		flush_tlb_l2_page(pmd);
+		spin_unlock(&init_mm.page_table_lock);
+	}
+#endif
 }
 
 static void vunmap_pmd_range(pud_t *pud, unsigned long addr, unsigned long end)
@@ -111,6 +137,9 @@ static int vmap_pte_range(pmd_t *pmd, unsigned long addr,
 		unsigned long end, pgprot_t prot, struct page **pages, int *nr)
 {
 	pte_t *pte;
+#ifdef CONFIG_TIMA_RKP_LAZY_MMU
+	unsigned long do_lazy_mmu = 0;
+#endif
 
 	/*
 	 * nr is a running index into the array which helps higher level
@@ -120,6 +149,16 @@ static int vmap_pte_range(pmd_t *pmd, unsigned long addr,
 	pte = pte_alloc_kernel(pmd, addr);
 	if (!pte)
 		return -ENOMEM;
+#ifdef CONFIG_TIMA_RKP_LAZY_MMU
+	if (boot_mode_security && tima_is_pg_protected((unsigned long)pte) == 1)
+		do_lazy_mmu = 1;
+	if (do_lazy_mmu) {
+		spin_lock(&init_mm.page_table_lock);
+		tima_send_cmd2((unsigned int)pmd, TIMA_LAZY_MMU_START, TIMA_LAZY_MMU_CMDID);
+		flush_tlb_l2_page(pmd);
+		spin_unlock(&init_mm.page_table_lock);
+	}
+#endif
 	do {
 		struct page *page = pages[*nr];
 
@@ -130,6 +169,14 @@ static int vmap_pte_range(pmd_t *pmd, unsigned long addr,
 		set_pte_at(&init_mm, addr, pte, mk_pte(page, prot));
 		(*nr)++;
 	} while (pte++, addr += PAGE_SIZE, addr != end);
+#ifdef CONFIG_TIMA_RKP_LAZY_MMU
+	if (do_lazy_mmu) {
+		spin_lock(&init_mm.page_table_lock);
+		tima_send_cmd2((unsigned int)pmd, TIMA_LAZY_MMU_STOP, TIMA_LAZY_MMU_CMDID);
+		flush_tlb_l2_page(pmd);
+		spin_unlock(&init_mm.page_table_lock);
+	}
+#endif
 	return 0;
 }
 
@@ -792,31 +839,13 @@ static unsigned long addr_to_vb_idx(unsigned long addr)
 	return addr;
 }
 
-static void *vmap_block_vaddr(unsigned long va_start, unsigned long pages_off)
-{
-	unsigned long addr;
-
-	addr = va_start + (pages_off << PAGE_SHIFT);
-	BUG_ON(addr_to_vb_idx(addr) != addr_to_vb_idx(va_start));
-	return (void *)addr;
-}
-
-/**
- * new_vmap_block - allocates new vmap_block and occupies 2^order pages in this
- *                  block. Of course pages number can't exceed VMAP_BBMAP_BITS
- * @order:    how many 2^order pages should be occupied in newly allocated block
- * @gfp_mask: flags for the page level allocator
- *
- * Returns: virtual address in a newly allocated block or ERR_PTR(-errno)
- */
-static void *new_vmap_block(unsigned int order, gfp_t gfp_mask)
+static struct vmap_block *new_vmap_block(gfp_t gfp_mask)
 {
 	struct vmap_block_queue *vbq;
 	struct vmap_block *vb;
 	struct vmap_area *va;
 	unsigned long vb_idx;
 	int node, err;
-	void *vaddr;
 
 	node = numa_node_id();
 
@@ -840,12 +869,9 @@ static void *new_vmap_block(unsigned int order, gfp_t gfp_mask)
 		return ERR_PTR(err);
 	}
 
-	vaddr = vmap_block_vaddr(va->va_start, 0);
 	spin_lock_init(&vb->lock);
 	vb->va = va;
-	/* At least something should be left free */
-	BUG_ON(VMAP_BBMAP_BITS <= (1UL << order));
-	vb->free = VMAP_BBMAP_BITS - (1UL << order);
+	vb->free = VMAP_BBMAP_BITS;
 	vb->dirty = 0;
 	bitmap_zero(vb->alloc_map, VMAP_BBMAP_BITS);
 	bitmap_zero(vb->dirty_map, VMAP_BBMAP_BITS);
@@ -861,11 +887,11 @@ static void *new_vmap_block(unsigned int order, gfp_t gfp_mask)
 	vbq = &get_cpu_var(vmap_block_queue);
 	vb->vbq = vbq;
 	spin_lock(&vbq->lock);
-	list_add_tail_rcu(&vb->free_list, &vbq->free);
+	list_add_rcu(&vb->free_list, &vbq->free);
 	spin_unlock(&vbq->lock);
 	put_cpu_var(vmap_block_queue);
 
-	return vaddr;
+	return vb;
 }
 
 static void free_vmap_block(struct vmap_block *vb)
@@ -918,6 +944,11 @@ static void purge_fragmented_blocks(int cpu)
 	}
 }
 
+static void purge_fragmented_blocks_thiscpu(void)
+{
+	purge_fragmented_blocks(smp_processor_id());
+}
+
 static void purge_fragmented_blocks_allcpus(void)
 {
 	int cpu;
@@ -930,8 +961,9 @@ static void *vb_alloc(unsigned long size, gfp_t gfp_mask)
 {
 	struct vmap_block_queue *vbq;
 	struct vmap_block *vb;
-	void *vaddr = NULL;
+	unsigned long addr = 0;
 	unsigned int order;
+	int purge = 0;
 
 	BUG_ON(size & ~PAGE_MASK);
 	BUG_ON(size > PAGE_SIZE*VMAP_MAX_ALLOC);
@@ -945,38 +977,56 @@ static void *vb_alloc(unsigned long size, gfp_t gfp_mask)
 	}
 	order = get_order(size);
 
+again:
 	rcu_read_lock();
 	vbq = &get_cpu_var(vmap_block_queue);
 	list_for_each_entry_rcu(vb, &vbq->free, free_list) {
-		unsigned long pages_off;
+		int i;
 
 		spin_lock(&vb->lock);
-		if (vb->free < (1UL << order)) {
-			spin_unlock(&vb->lock);
-			continue;
-		}
+		if (vb->free < 1UL << order)
+			goto next;
 
-		pages_off = VMAP_BBMAP_BITS - vb->free;
-		vaddr = vmap_block_vaddr(vb->va->va_start, pages_off);
+		i = bitmap_find_free_region(vb->alloc_map,
+						VMAP_BBMAP_BITS, order);
+
+		if (i < 0) {
+			if (vb->free + vb->dirty == VMAP_BBMAP_BITS) {
+				/* fragmented and no outstanding allocations */
+				BUG_ON(vb->dirty != VMAP_BBMAP_BITS);
+				purge = 1;
+			}
+			goto next;
+		}
+		addr = vb->va->va_start + (i << PAGE_SHIFT);
+		BUG_ON(addr_to_vb_idx(addr) !=
+				addr_to_vb_idx(vb->va->va_start));
 		vb->free -= 1UL << order;
 		if (vb->free == 0) {
 			spin_lock(&vbq->lock);
 			list_del_rcu(&vb->free_list);
 			spin_unlock(&vbq->lock);
 		}
-
 		spin_unlock(&vb->lock);
 		break;
+next:
+		spin_unlock(&vb->lock);
 	}
+
+	if (purge)
+		purge_fragmented_blocks_thiscpu();
 
 	put_cpu_var(vmap_block_queue);
 	rcu_read_unlock();
 
-	/* Allocate new block if nothing was found */
-	if (!vaddr)
-		vaddr = new_vmap_block(order, gfp_mask);
+	if (!addr) {
+		vb = new_vmap_block(gfp_mask);
+		if (IS_ERR(vb))
+			return vb;
+		goto again;
+	}
 
-	return vaddr;
+	return (void *)addr;
 }
 
 static void vb_free(const void *addr, unsigned long size)
@@ -1285,15 +1335,19 @@ void unmap_kernel_range(unsigned long addr, unsigned long size)
 	flush_tlb_kernel_range(addr, end);
 }
 
-int map_vm_area(struct vm_struct *area, pgprot_t prot, struct page **pages)
+int map_vm_area(struct vm_struct *area, pgprot_t prot, struct page ***pages)
 {
 	unsigned long addr = (unsigned long)area->addr;
 	unsigned long end = addr + area->size - PAGE_SIZE;
 	int err;
 
-	err = vmap_page_range(addr, end, prot, pages);
+	err = vmap_page_range(addr, end, prot, *pages);
+	if (err > 0) {
+		*pages += err;
+		err = 0;
+	}
 
-	return err > 0 ? 0 : err;
+	return err;
 }
 EXPORT_SYMBOL_GPL(map_vm_area);
 
@@ -1585,7 +1639,7 @@ void *vmap(struct page **pages, unsigned int count,
 	if (!area)
 		return NULL;
 
-	if (map_vm_area(area, prot, pages)) {
+	if (map_vm_area(area, prot, &pages)) {
 		vunmap(area->addr);
 		return NULL;
 	}
@@ -1642,7 +1696,7 @@ static void *__vmalloc_area_node(struct vm_struct *area, gfp_t gfp_mask,
 		area->pages[i] = page;
 	}
 
-	if (map_vm_area(area, prot, pages))
+	if (map_vm_area(area, prot, &pages))
 		goto fail;
 	return area->addr;
 
