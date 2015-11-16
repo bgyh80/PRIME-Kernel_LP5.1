@@ -1186,7 +1186,7 @@ cull_mlocked:
 
 activate_locked:
 		/* Not a candidate for swapping, so reclaim swap space. */
-		if (PageSwapCache(page) && vm_swap_full())
+		if (PageSwapCache(page) && vm_swap_full(page_swap_info(page)))
 			try_to_free_swap(page);
 		VM_BUG_ON(PageActive(page));
 		SetPageActive(page);
@@ -1242,8 +1242,7 @@ unsigned long reclaim_clean_pages_from_list(struct zone *zone,
 }
 
 #ifdef CONFIG_PROCESS_RECLAIM
-unsigned long reclaim_pages_from_list(struct list_head *page_list,
-					struct vm_area_struct *vma)
+unsigned long reclaim_pages_from_list(struct list_head *page_list)
 {
 	struct scan_control sc = {
 		.gfp_mask = GFP_KERNEL,
@@ -1251,7 +1250,6 @@ unsigned long reclaim_pages_from_list(struct list_head *page_list,
 		.may_writepage = 1,
 		.may_unmap = 1,
 		.may_swap = 1,
-		.target_vma = vma,
 	};
 
 	unsigned long nr_reclaimed;
@@ -1692,7 +1690,7 @@ shrink_inactive_list(unsigned long nr_to_scan, struct lruvec *lruvec,
 		 * Tag a zone as congested if all the dirty pages scanned were
 		 * backed by a congested BDI and wait_iff_congested will stall.
 		 */
-		if (nr_dirty && nr_dirty == nr_congested)
+		if (nr_dirty && nr_dirty == nr_congested && zone)
 			zone_set_flag(zone, ZONE_CONGESTED);
 
 		/*

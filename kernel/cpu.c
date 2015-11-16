@@ -22,6 +22,7 @@
 
 #ifdef CONFIG_ARM_EXYNOS_MP_CPUFREQ
 #include <mach/cpufreq.h>
+#include <linux/cpufreq.h>
 #endif
 
 #include <linux/sec_debug.h>
@@ -435,6 +436,9 @@ static int __cpuinit _cpu_up(unsigned int cpu, int tasks_frozen)
 
 	/* Now call notifier in preparation. */
 	cpu_notify(CPU_ONLINE | mod, hcpu);
+
+	/* Boost the onlined cpu */
+	cafactive_boost_ondemand(cpu, 500, false);
 
 out_notify:
 	if (ret != 0)
