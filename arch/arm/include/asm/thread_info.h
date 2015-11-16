@@ -157,6 +157,7 @@ extern int vfp_restore_user_hwstate(struct user_vfp __user *,
 #define TIF_MEMDIE		18	/* is terminating due to OOM killer */
 #define TIF_RESTORE_SIGMASK	20
 #define TIF_MM_RELEASED		24
+#define TIF_MM_RECLAIMED	25	/* task MM has been reclaimed */
 
 #define _TIF_SIGPENDING		(1 << TIF_SIGPENDING)
 #define _TIF_NEED_RESCHED	(1 << TIF_NEED_RESCHED)
