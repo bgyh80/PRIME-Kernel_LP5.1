@@ -674,6 +674,7 @@ static ssize_t touchkey_baseline_data1_show(struct device *dev,
 	return touchkey_fac_read_data(dev, buf, &cmd);
 }
 
+extern void mdnie_toggle_negative(void);
 
 static ssize_t touchkey_baseline_data2_show(struct device *dev,
 				       struct device_attribute *attr, char *buf)
@@ -1086,13 +1087,27 @@ static int touchkey_i2c_update(struct touchkey_i2c *tkey_i2c)
 	return ret;
 }
 
+static bool suspended = false;
+
+static inline int64_t get_time_inms(void) {
+	int64_t tinms;
+	struct timespec cur_time = current_kernel_time();
+	tinms =  cur_time.tv_sec * MSEC_PER_SEC;
+	tinms += cur_time.tv_nsec / NSEC_PER_MSEC;
+	return tinms;
+}
+
+extern void mdnie_toggle_negative(void);
+
 static irqreturn_t touchkey_interrupt(int irq, void *dev_id)
 {
 	struct touchkey_i2c *tkey_i2c = dev_id;
 	u8 data[3];
 	int ret;
-	int keycode_type = 0;
-	int pressed;
+	int i;
+	int keycode_data[touchkey_count];
+	static int64_t mtkey_lasttime = 0;
+	static int mtkey_count = 0;
 
 	if (unlikely(!touchkey_probe)) {
 		tk_debug_err(true, &tkey_i2c->client->dev, "%s: Touchkey is not probed\n", __func__);
@@ -1103,52 +1118,48 @@ static irqreturn_t touchkey_interrupt(int irq, void *dev_id)
 	if (ret < 0)
 		return IRQ_HANDLED;
 
-	if (tkey_i2c->fw_ver_ic >= tkey_i2c->pdata->multi_fw_ver && tkey_i2c->support_multi_touch == 1) {
-		int i;
-		int keycode_data[touchkey_count];
+	keycode_data[1] = data[0] & 0x3;
+	keycode_data[2] = (data[0] >> 2) & 0x3;
 
-		keycode_data[1] = data[0] & 0x3;
-		keycode_data[2] = (data[0] >> 2) & 0x3;
-
-		for (i = 1; i < touchkey_count; i++) {
-			if (keycode_data[i]) {
-				input_report_key(tkey_i2c->input_dev, touchkey_keycode[i], (keycode_data[i] % 2));
+	for (i = 1; i < touchkey_count; i++) {
+		if (keycode_data[i]) {
+			input_report_key(tkey_i2c->input_dev, touchkey_keycode[i], (keycode_data[i] % 2));
 #if !defined(CONFIG_SAMSUNG_PRODUCT_SHIP)
-				tk_debug_info(true, &tkey_i2c->client->dev, "keycode: %d %s, %#x %#x %d\n",
-						touchkey_keycode[i], (keycode_data[i] % 2) ? "PRESS" : "RELEASE",
-						tkey_i2c->fw_ver_ic, tkey_i2c->md_ver_ic, tkey_i2c->mc_data.cur_mode);
+			tk_debug_err(true, &tkey_i2c->client->dev, "keycode: %d %s, %#x %#x %d\n",
+					touchkey_keycode[i], (keycode_data[i] % 2) ? "PRESS" : "RELEASE",
+					tkey_i2c->fw_ver_ic, tkey_i2c->md_ver_ic, tkey_i2c->mc_data.cur_mode);
 #else
-				tk_debug_info(true, &tkey_i2c->client->dev, " %s, %#x %#x %d\n",
-						(keycode_data[i] % 2) ? "PRESS" : "RELEASE", tkey_i2c->fw_ver_ic,
-							tkey_i2c->md_ver_ic, tkey_i2c->mc_data.cur_mode);
+			tk_debug_err(true, &tkey_i2c->client->dev, " %s, %#x %#x %d\n",
+					(keycode_data[i] % 2) ? "PRESS" : "RELEASE", tkey_i2c->fw_ver_ic,
+						tkey_i2c->md_ver_ic, tkey_i2c->mc_data.cur_mode);
 #endif
+#if defined(CONFIG_INPUT_BOOSTER)
+			input_booster_send_event(BOOSTER_DEVICE_TOUCHKEY, (keycode_data[i] % 2));
+#endif
+			if (!suspended) {
+				//mdnie negative effect toggle by gm
+				if (touchkey_keycode[i] == 254) {
+					if (keycode_data[i] % 2) {
+						if (get_time_inms() - mtkey_lasttime < 300) {
+							mtkey_count++;
+							printk(KERN_INFO "repeated mtkey action %d.\n", mtkey_count);
+						} else {
+							mtkey_count = 0;
+						}
+					} else {
+						if (mtkey_count == 3) {
+							mdnie_toggle_negative();
+							mtkey_count = 0;
+						}
+						mtkey_lasttime = get_time_inms();
+					}
+				}
 			}
 		}
-		input_sync(tkey_i2c->input_dev);
-	} else {
-		keycode_type = (data[0] & TK_BIT_KEYCODE);
-		pressed = !(data[0] & TK_BIT_PRESS_EV);
-
-		if (keycode_type <= 0 || keycode_type >= touchkey_count) {
-			tk_debug_dbg(true, &tkey_i2c->client->dev, "keycode_type err\n");
-			return IRQ_HANDLED;
-		}
-
-		input_report_key(tkey_i2c->input_dev,
-				 touchkey_keycode[keycode_type], pressed);
-#if defined(CONFIG_INPUT_BOOSTER)
-				input_booster_send_event(BOOSTER_DEVICE_TOUCHKEY, keycode_type);
-#endif
-		input_sync(tkey_i2c->input_dev);
-#if !defined(CONFIG_SAMSUNG_PRODUCT_SHIP)
-		tk_debug_info(true, &tkey_i2c->client->dev, "keycode:%d pressed:%d %#x, %#x %d\n",
-		touchkey_keycode[keycode_type], pressed, tkey_i2c->fw_ver_ic,
-		tkey_i2c->md_ver_ic, tkey_i2c->mc_data.cur_mode);
-#else
-		tk_debug_info(true, &tkey_i2c->client->dev, "pressed:%d %#x, %#x, %d\n",
-			pressed, tkey_i2c->fw_ver_ic, tkey_i2c->md_ver_ic, tkey_i2c->mc_data.cur_mode);
-#endif
 	}
+
+	input_sync(tkey_i2c->input_dev);
+
 	return IRQ_HANDLED;
 }
 
@@ -1378,6 +1389,8 @@ static int sec_touchkey_early_suspend(struct power_suspend *h)
 
 	tk_debug_dbg(true, &tkey_i2c->client->dev, "%s\n", __func__);
 
+	suspended = true;
+
 	return 0;
 }
 
@@ -1389,6 +1402,8 @@ static int sec_touchkey_late_resume(struct power_suspend *h)
 	tk_debug_dbg(true, &tkey_i2c->client->dev, "%s\n", __func__);
 
 	touchkey_start(tkey_i2c);
+
+	suspended = false;
 
 	return 0;
 }
