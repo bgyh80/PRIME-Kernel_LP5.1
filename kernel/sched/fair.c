@@ -7294,7 +7294,7 @@ static int hmp_packing_ilb_needed(int cpu, int ilb_needed)
 
 DEFINE_PER_CPU(cpumask_var_t, ilb_tmpmask);
 
-static inline int find_new_ilb(int call_cpu)
+static inline int find_new_ilb(void)
 {
 	int ilb = cpumask_first(nohz.idle_cpus_mask);
 #ifdef CONFIG_SCHED_HMP
@@ -7343,7 +7343,7 @@ static void nohz_balancer_kick(int cpu)
 
 	nohz.next_balance++;
 
-	ilb_cpu = find_new_ilb(cpu);
+	ilb_cpu = find_new_ilb();
 
 	if (ilb_cpu >= nr_cpu_ids)
 		return;
