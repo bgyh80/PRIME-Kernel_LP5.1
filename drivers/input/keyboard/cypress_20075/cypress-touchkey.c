@@ -1150,7 +1150,7 @@ static irqreturn_t touchkey_interrupt(int irq, void *dev_id)
 								mtkey_count = 0;
 							}
 						} else {
-							if (mtkey_count == 3) {
+							if (mtkey_count == 2) {
 								mdnie_toggle_negative();
 								mtkey_count = 0;
 							}
