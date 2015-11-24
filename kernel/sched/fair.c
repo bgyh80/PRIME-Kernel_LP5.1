@@ -7294,7 +7294,7 @@ static int hmp_packing_ilb_needed(int cpu, int ilb_needed)
 
 DEFINE_PER_CPU(cpumask_var_t, ilb_tmpmask);
 
-static inline int find_new_ilb(void)
+static inline int find_new_ilb(int call_cpu)
 {
 	int ilb = cpumask_first(nohz.idle_cpus_mask);
 #ifdef CONFIG_SCHED_HMP
@@ -7337,13 +7337,13 @@ static inline int find_new_ilb(void)
  * nohz_load_balancer CPU (if there is one) otherwise fallback to any idle
  * CPU (if there is one).
  */
-static void nohz_balancer_kick(void)
+static void nohz_balancer_kick(int cpu)
 {
 	int ilb_cpu;
 
 	nohz.next_balance++;
 
-	ilb_cpu = find_new_ilb();
+	ilb_cpu = find_new_ilb(cpu);
 
 	if (ilb_cpu >= nr_cpu_ids)
 		return;
@@ -8210,13 +8210,15 @@ static inline int on_null_domain(struct rq *rq)
  */
 void trigger_load_balance(struct rq *rq)
 {
+	int cpu = rq->cpu;
+	
 	/* Don't need to rebalance while attached to NULL domain */
 	if (time_after_eq(jiffies, rq->next_balance) &&
 	    likely(!on_null_domain(rq)))
 		raise_softirq(SCHED_SOFTIRQ);
 #ifdef CONFIG_NO_HZ_COMMON
 	if (nohz_kick_needed(rq) && likely(!on_null_domain(rq)))
-		nohz_balancer_kick();
+		nohz_balancer_kick(cpu);
 #endif
 }
 
