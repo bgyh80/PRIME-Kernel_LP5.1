@@ -1048,9 +1048,9 @@ extern void idle_exit_fair(struct rq *this_rq);
 
 #else	/* CONFIG_SMP */
 
-static inline void idle_balance(int cpu, struct rq *rq)
-{
-}
+static inline void idle_balance(int cpu, struct rq *rq) { }
+static inline void idle_enter_fair(struct rq *rq) { }
+static inline void idle_exit_fair(struct rq *rq) { }
 
 #endif
 
