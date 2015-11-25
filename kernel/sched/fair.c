@@ -6691,6 +6691,8 @@ static int task_hot(struct task_struct *p, struct lb_env *env)
 {
 	s64 delta;
 
+	lockdep_assert_held(&env->src_rq->lock);
+
 	if (p->sched_class != &fair_sched_class)
 		return 0;
 
@@ -6754,6 +6756,9 @@ static
 int can_migrate_task(struct task_struct *p, struct lb_env *env)
 {
 	int tsk_cache_hot = 0;
+
+	lockdep_assert_held(&env->src_rq->lock);
+
 	/*
 	 * We do not migrate tasks that are:
 	 * 1) throttled_lb_pair, or
@@ -6824,30 +6829,49 @@ int can_migrate_task(struct task_struct *p, struct lb_env *env)
 }
 
 /*
- * move_one_task tries to move exactly one task from busiest to this_rq, as
+ * detach_one_task() -- tries to dequeue exactly one task from env->src_rq, as
  * part of active balancing operations within "domain".
- * Returns 1 if successful and 0 otherwise.
  *
- * Called with both runqueues locked.
+ * Returns a task if successful and NULL otherwise.
  */
-static int move_one_task(struct lb_env *env)
+static struct task_struct *detach_one_task(struct lb_env *env)
 {
 	struct task_struct *p, *n;
+
+	lockdep_assert_held(&env->src_rq->lock);
 
 	list_for_each_entry_safe(p, n, &env->src_rq->cfs_tasks, se.group_node) {
 		if (!can_migrate_task(p, env))
 			continue;
 
-		move_task(p, env);
+		deactivate_task(env->src_rq, p, 0);
+		p->on_rq = TASK_ON_RQ_MIGRATING;
+		set_task_cpu(p, env->dst_cpu);
+
 		/*
-		 * Right now, this is only the second place move_task()
-		 * is called, so we can safely collect move_task()
-		 * stats here rather than inside move_task().
+		 * Right now, this is only the second place where
+		 * lb_gained[env->idle] is updated (other is move_tasks)
+		 * so we can safely collect stats here rather than
+		 * inside move_tasks().
 		 */
 		schedstat_inc(env->sd, lb_gained[env->idle]);
-		return 1;
+		return p;
 	}
-	return 0;
+	return NULL;
+}
+
+/*
+ * attach_one_task() -- attaches the task returned from detach_one_task() to
+ * its new rq.
+ */
+static void attach_one_task(struct rq *rq, struct task_struct *p)
+{
+	raw_spin_lock(&rq->lock);
+	BUG_ON(task_rq(p) != rq);
+	p->on_rq = TASK_ON_RQ_QUEUED;
+	activate_task(rq, p, 0);
+	check_preempt_curr(rq, p, 0);
+	raw_spin_unlock(&rq->lock);
 }
 
 static unsigned long task_h_load(struct task_struct *p);
@@ -8353,9 +8377,7 @@ static int __do_active_load_balance_cpu_stop(void *data, bool check_sd_lb_flag)
 	struct task_struct *p = NULL;
 
 	raw_spin_lock_irq(&busiest_rq->lock);
-#ifdef CONFIG_SCHED_HMP
-	p = busiest_rq->migrate_task;
-#endif
+
 	/* make sure the requested cpu hasn't gone down in the meantime */
 	if (unlikely(busiest_cpu != smp_processor_id() ||
 		     !busiest_rq->active_balance))
@@ -8365,11 +8387,6 @@ static int __do_active_load_balance_cpu_stop(void *data, bool check_sd_lb_flag)
 	if (busiest_rq->nr_running <= 1)
 		goto out_unlock;
 
-	if (!check_sd_lb_flag) {
-		/* Task has migrated meanwhile, abort forced migration */
-		if (task_rq(p) != busiest_rq)
-			goto out_unlock;
-	}
 	/*
 	 * This condition is "impossible", if it occurs
 	 * we need to fix it. Originally reported by
@@ -8377,20 +8394,15 @@ static int __do_active_load_balance_cpu_stop(void *data, bool check_sd_lb_flag)
 	 */
 	BUG_ON(busiest_rq == target_rq);
 
-	/* move a task from busiest_rq to target_rq */
-	double_lock_balance(busiest_rq, target_rq);
-
 	/* Search for an sd spanning us and the target CPU. */
 	rcu_read_lock();
 	for_each_domain(target_cpu, sd) {
-		if (((check_sd_lb_flag && sd->flags & SD_LOAD_BALANCE) ||
-			!check_sd_lb_flag) &&
-			cpumask_test_cpu(busiest_cpu, sched_domain_span(sd)))
+		if ((sd->flags & SD_LOAD_BALANCE) &&
+		    cpumask_test_cpu(busiest_cpu, sched_domain_span(sd)))
 				break;
 	}
 
 	if (likely(sd)) {
-		bool success = false;
 		struct lb_env env = {
 			.sd		= sd,
 			.dst_cpu	= target_cpu,
@@ -8402,25 +8414,22 @@ static int __do_active_load_balance_cpu_stop(void *data, bool check_sd_lb_flag)
 
 		schedstat_inc(sd, alb_count);
 
-		if (check_sd_lb_flag) {
-			if (move_one_task(&env))
-				success = true;
-		} else {
-			if (move_specific_task(&env, p))
-				success = true;
-		}
-		if (success)
+		p = detach_one_task(&env);
+		if (p)
 			schedstat_inc(sd, alb_pushed);
 		else
 			schedstat_inc(sd, alb_failed);
 	}
 	rcu_read_unlock();
-	double_unlock_balance(busiest_rq, target_rq);
 out_unlock:
 	busiest_rq->active_balance = 0;
-	raw_spin_unlock_irq(&busiest_rq->lock);
-	if (!check_sd_lb_flag)
-		put_task_struct(p);
+	raw_spin_unlock(&busiest_rq->lock);
+
+	if (p)
+		attach_one_task(target_rq, p);
+
+	local_irq_enable();
+
 	return 0;
 }
 
