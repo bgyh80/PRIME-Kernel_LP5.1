@@ -2186,6 +2186,8 @@ static __always_inline u64 decay_load(u64 val, u64 n)
 	return val >> 32;
 }
 
+unsigned long __weak arch_scale_freq_capacity(struct sched_domain *sd, int cpu);
+
 /*
  * For updates fully spanning n periods, the contribution to runnable
  * average will be: \Sum 1024*y^n
@@ -2345,6 +2347,7 @@ static __always_inline int __update_entity_runnable_avg(u64 now,
 	u64 delta, periods;
 	u32 runnable_contrib;
 	int delta_w, decayed = 0;
+	unsigned long scale_freq = arch_scale_freq_capacity(NULL, cpu);
 #ifdef CONFIG_HMP_FREQUENCY_INVARIANT_SCALE
 	u64 scaled_delta;
 	u32 scaled_runnable_contrib;
@@ -2407,7 +2410,8 @@ static __always_inline int __update_entity_runnable_avg(u64 now,
 			sa->usage_avg_sum += delta_w;
 #endif /* #ifdef CONFIG_HMP_FREQUENCY_INVARIANT_SCALE */
 		if (running)
-			sa->running_avg_sum += delta_w;
+			sa->running_avg_sum += delta_w * scale_freq
+				>> SCHED_CAPACITY_SHIFT;
 		sa->avg_period += delta_w;
 
 		delta -= delta_w;
@@ -2444,7 +2448,8 @@ static __always_inline int __update_entity_runnable_avg(u64 now,
 			sa->usage_avg_sum += runnable_contrib;
 #endif /* CONFIG_HMP_FREQUENCY_INVARIANT_SCALE */
 		if (running)
-			sa->running_avg_sum += runnable_contrib;
+			sa->running_avg_sum += runnable_contrib * scale_freq
+				>> SCHED_CAPACITY_SHIFT;
 		sa->avg_period += runnable_contrib;
 
 		sa->remainder = delta;
@@ -2467,7 +2472,8 @@ static __always_inline int __update_entity_runnable_avg(u64 now,
 		sa->usage_avg_sum += delta;
 #endif /* CONFIG_HMP_FREQUENCY_INVARIANT_SCALE */
 	if (running)
-		sa->running_avg_sum += delta;
+		sa->running_avg_sum += delta * scale_freq
+			>> SCHED_CAPACITY_SHIFT;
 	sa->avg_period += delta;
 
 	return decayed;
@@ -2854,8 +2860,8 @@ static inline void update_entity_load_avg(struct sched_entity *se,
 {
 	struct cfs_rq *cfs_rq = cfs_rq_of(se);
 	long contrib_delta, ratio_delta, utilization_delta;
+	int cpu = cpu_of(rq_of(cfs_rq));
 	u64 now;
-	int cpu = -1;   /* not used in normal case */
 
 #ifdef CONFIG_HMP_FREQUENCY_INVARIANT_SCALE
 	cpu = cfs_rq->rq->cpu;
