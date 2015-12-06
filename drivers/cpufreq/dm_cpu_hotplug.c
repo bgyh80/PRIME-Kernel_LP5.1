@@ -565,8 +565,6 @@ static int fb_state_change(struct notifier_block *nb,
 	struct fb_event *evdata = data;
 	struct fb_info *info = evdata->info;
 	unsigned int blank;
-	char * envp[] = { "HOME=/", NULL };
-	char * argv[] = { "/sbin/freq_restore.sh", NULL };
 
 	if (val != FB_EVENT_BLANK &&
 		val != FB_R_EARLY_EVENT_BLANK)
@@ -597,7 +595,6 @@ static int fb_state_change(struct notifier_block *nb,
 		set_lcd_is_on(true);
 		pr_info("LCD is on\n");
 
-		call_usermodehelper(argv[0], argv, envp, UMH_WAIT_EXEC);
 		break;
 	default:
 		break;
