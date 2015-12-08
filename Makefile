@@ -377,7 +377,7 @@ KBUILD_CPPFLAGS := -D__KERNEL__
 
 KBUILD_CFLAGS   := -Wall -Wundef -Wstrict-prototypes -Wno-trigraphs \
 		   -fno-strict-aliasing -fno-common \
-		   -mfpu=neon-vfpv4 -fno-pic \
+		   -mfpu=neon-vfpv4 -fno-pic -pipe \
 		   -Werror-implicit-function-declaration \
 		   -Wno-maybe-uninitialized -Wno-unused-variable \
 		   -Wno-format-security \
@@ -385,8 +385,9 @@ KBUILD_CFLAGS   := -Wall -Wundef -Wstrict-prototypes -Wno-trigraphs \
 		   -Wno-array-bounds -Wno-switch -munaligned-access \
 		   -fno-delete-null-pointer-checks \
 		   -fdiagnostics-show-option -Werror \
-		   -march=armv8-a+crc
-#		   -mtune=cortex-a53
+		   -march=armv8-a+crc \
+		   -std=gnu89
+#		   -mcpu=cortex-a53 -mtune=cortex-a53 \
 
 KBUILD_AFLAGS_KERNEL :=
 KBUILD_CFLAGS_KERNEL :=
