@@ -107,11 +107,6 @@ static inline unsigned int tbase_get_irqsafe(struct tvec_base *base)
 	return ((unsigned int)(unsigned long)base & TIMER_IRQSAFE);
 }
 
-static inline unsigned int tbase_get_pinned(struct tvec_base *base)
-{
-	return ((unsigned int)(unsigned long)base & TIMER_PINNED);
-}
-
 static inline struct tvec_base *tbase_get_base(struct tvec_base *base)
 {
 	return ((struct tvec_base *)((unsigned long)base & ~TIMER_FLAG_MASK));
@@ -123,13 +118,6 @@ timer_set_base(struct timer_list *timer, struct tvec_base *new_base)
 	unsigned long flags = (unsigned long)timer->base & TIMER_FLAG_MASK;
 
 	timer->base = (struct tvec_base *)((unsigned long)(new_base) | flags);
-}
-
-static inline void
-timer_set_flags(struct timer_list *timer, unsigned int flags)
-{
-	timer->base = (struct tvec_base *)((unsigned long)(timer->base) |
-					   flags);
 }
 
 static unsigned long round_jiffies_common(unsigned long j, int cpu,
@@ -744,7 +732,8 @@ static struct tvec_base *lock_timer_base(struct timer_list *timer,
 }
 
 static inline int
-__mod_timer(struct timer_list *timer, unsigned long expires, bool pending_only)
+__mod_timer(struct timer_list *timer, unsigned long expires,
+						bool pending_only, int pinned)
 {
 	struct tvec_base *base, *new_base;
 	unsigned long flags;
@@ -764,7 +753,12 @@ __mod_timer(struct timer_list *timer, unsigned long expires, bool pending_only)
 #ifdef CONFIG_SMP
 	if (base != tvec_base_deferral) {
 #endif
-		cpu = get_nohz_timer_target(tbase_get_pinned(timer->base));
+		 cpu = smp_processor_id();
+
+#if defined(CONFIG_NO_HZ_COMMON) && defined(CONFIG_SMP)
+		if (!pinned && get_sysctl_timer_migration() && idle_cpu(cpu))
+			cpu = get_nohz_timer_target();
+#endif
 		new_base = per_cpu(tvec_bases, cpu);
 
 		if (base != new_base) {
@@ -858,7 +852,7 @@ out_unlock:
  */
 int mod_timer_pending(struct timer_list *timer, unsigned long expires)
 {
-	return __mod_timer(timer, expires, true);
+	return __mod_timer(timer, expires, true, TIMER_NOT_PINNED);
 }
 EXPORT_SYMBOL(mod_timer_pending);
 
@@ -933,7 +927,7 @@ int mod_timer(struct timer_list *timer, unsigned long expires)
 	if (timer_pending(timer) && timer->expires == expires)
 		return 1;
 
-	return __mod_timer(timer, expires, false);
+	return __mod_timer(timer, expires, false, TIMER_NOT_PINNED);
 }
 EXPORT_SYMBOL(mod_timer);
 
@@ -977,8 +971,7 @@ int mod_timer_pinned(struct timer_list *timer, unsigned long expires)
 	if (timer->expires == expires && timer_pending(timer))
 		return 1;
 
-	timer_set_flags(timer, TIMER_PINNED);
-	return __mod_timer(timer, expires, false);
+	return __mod_timer(timer, expires, false, TIMER_PINNED);
 }
 EXPORT_SYMBOL(mod_timer_pinned);
 
@@ -1017,7 +1010,6 @@ void add_timer_on(struct timer_list *timer, int cpu)
 
 	timer_stats_timer_set_start_info(timer);
 	BUG_ON(timer_pending(timer) || !timer->function);
-	timer_set_flags(timer, TIMER_PINNED);
 	spin_lock_irqsave(&base->lock, flags);
 	timer_set_base(timer, base);
 	debug_activate(timer, timer->expires);
@@ -1572,7 +1564,7 @@ signed long __sched schedule_timeout(signed long timeout)
 	expire = timeout + jiffies;
 
 	setup_timer_on_stack(&timer, process_timeout, (unsigned long)current);
-	__mod_timer(&timer, expire, false);
+	__mod_timer(&timer, expire, false, TIMER_NOT_PINNED);
 	schedule();
 	del_singleshot_timer_sync(&timer);
 
@@ -1684,49 +1676,27 @@ static int init_timers_cpu(int cpu)
 	return 0;
 }
 
-#if defined(CONFIG_HOTPLUG_CPU) || defined(CONFIG_CPUSETS)
-static void migrate_timer_list(struct tvec_base *new_base,
-			       struct list_head *head, bool remove_pinned)
+#ifdef CONFIG_HOTPLUG_CPU
+static void migrate_timer_list(struct tvec_base *new_base, struct list_head *head)
 {
 	struct timer_list *timer;
-	struct list_head pinned_list;
-	int is_pinned;
-
-	INIT_LIST_HEAD(&pinned_list);
 
 	while (!list_empty(head)) {
 		timer = list_first_entry(head, struct timer_list, entry);
-
-		is_pinned = tbase_get_pinned(timer->base);
-		if (!remove_pinned && is_pinned) {
-			list_move_tail(&timer->entry, &pinned_list);
-			continue;
-		} else {
-			/* We ignore the accounting on the dying cpu */
-			detach_timer(timer, false);
-		}
-
-		/* Check if CPU still has pinned timers */
-		if (unlikely(WARN(is_pinned,
-				  "%s: can't migrate pinned timer: %p, deactivating it\n",
-				  __func__, timer)))
-			continue;
-
+		/* We ignore the accounting on the dying cpu */
+		detach_timer(timer, false);
 		timer_set_base(timer, new_base);
 		internal_add_timer(new_base, timer);
 	}
-
-	if (!list_empty(&pinned_list))
-		list_splice_tail(&pinned_list, head);
 }
 
-/* Migrate timers from 'cpu' to this_cpu */
-static void __migrate_timers(int cpu, bool remove_pinned)
+static void migrate_timers(int cpu)
 {
 	struct tvec_base *old_base;
 	struct tvec_base *new_base;
 	int i;
 
+	BUG_ON(cpu_online(cpu));
 	old_base = per_cpu(tvec_bases, cpu);
 	new_base = get_cpu_var(tvec_bases);
 	/*
@@ -1739,39 +1709,19 @@ static void __migrate_timers(int cpu, bool remove_pinned)
 	BUG_ON(old_base->running_timer);
 
 	for (i = 0; i < TVR_SIZE; i++)
-		migrate_timer_list(new_base, old_base->tv1.vec + i,
-				remove_pinned);
+		migrate_timer_list(new_base, old_base->tv1.vec + i);
 	for (i = 0; i < TVN_SIZE; i++) {
-		migrate_timer_list(new_base, old_base->tv2.vec + i,
-				remove_pinned);
-		migrate_timer_list(new_base, old_base->tv3.vec + i,
-				remove_pinned);
-		migrate_timer_list(new_base, old_base->tv4.vec + i,
-				remove_pinned);
-		migrate_timer_list(new_base, old_base->tv5.vec + i,
-				remove_pinned);
+		migrate_timer_list(new_base, old_base->tv2.vec + i);
+		migrate_timer_list(new_base, old_base->tv3.vec + i);
+		migrate_timer_list(new_base, old_base->tv4.vec + i);
+		migrate_timer_list(new_base, old_base->tv5.vec + i);
 	}
 
 	spin_unlock(&old_base->lock);
 	spin_unlock_irq(&new_base->lock);
 	put_cpu_var(tvec_bases);
 }
-#endif /* CONFIG_HOTPLUG_CPU || CONFIG_CPUSETS */
-
-#ifdef CONFIG_HOTPLUG_CPU
-static void migrate_timers(int cpu)
-{
-	BUG_ON(cpu_online(cpu));
-	__migrate_timers(cpu, true);
-}
 #endif /* CONFIG_HOTPLUG_CPU */
-
-#ifdef CONFIG_CPUSETS
-void timer_quiesce_cpu(void *cpup)
-{
-	__migrate_timers(*(int *)cpup, false);
-}
-#endif /* CONFIG_CPUSETS */
 
 static int timer_cpu_notify(struct notifier_block *self,
 				unsigned long action, void *hcpu)
