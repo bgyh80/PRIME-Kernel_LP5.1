@@ -1793,7 +1793,7 @@ CONFIG_BCMDHD_PCIE=y
 # CONFIG_HERMES is not set
 # CONFIG_WL_TI is not set
 # CONFIG_MWIFIEX is not set
-# CONFIG_LGUIWLAN is not set
+CONFIG_LGUIWLAN=y
 
 #
 # Enable WiMAX (Networking options) to see the WiMAX drivers
