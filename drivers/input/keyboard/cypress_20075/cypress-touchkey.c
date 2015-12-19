@@ -674,8 +674,6 @@ static ssize_t touchkey_baseline_data1_show(struct device *dev,
 	return touchkey_fac_read_data(dev, buf, &cmd);
 }
 
-extern void mdnie_toggle_negative(void);
-
 static ssize_t touchkey_baseline_data2_show(struct device *dev,
 				       struct device_attribute *attr, char *buf)
 {
