@@ -20,18 +20,18 @@
 
 #include <linux/moduleparam.h>
 
-static int enable_sensorhub_wl = 1;
-static int enable_ssp_wl = 1;
-static int enable_bcm4773_wl = 1;
-static int enable_lli_pm_wl = 1;
-static int enable_radio_interface_wl = 1;
-static int enable_umts_ipc0_wl = 1;
-module_param(enable_sensorhub_wl, int, 0644);
-module_param(enable_ssp_wl, int, 0644);
-module_param(enable_bcm4773_wl, int, 0644);
-module_param(enable_lli_pm_wl, int, 0644);
-module_param(enable_radio_interface_wl, int, 0644);
-module_param(enable_umts_ipc0_wl, int, 0644);
+static int enable_sensorhub_ws = 1;
+static int enable_ssp_ws = 1;
+static int enable_bcm4773_ws = 1;
+static int enable_lli_pm_ws = 1;
+static int enable_radio_interface_ws = 1;
+static int enable_umts_ipc0_ws = 1;
+module_param(enable_sensorhub_ws, int, 0644);
+module_param(enable_ssp_ws, int, 0644);
+module_param(enable_bcm4773_ws, int, 0644);
+module_param(enable_lli_pm_ws, int, 0644);
+module_param(enable_radio_interface_ws, int, 0644);
+module_param(enable_umts_ipc0_ws, int, 0644);
 
 /*
  * If set, the suspend/hibernate code will abort transitions to a sleep state
@@ -403,32 +403,32 @@ static void wakeup_source_activate(struct wakeup_source *ws)
 {
 	unsigned int cec;
 
-	if (!enable_sensorhub_wl && !strcmp(ws->name, "ssp_sensorhub_wake_lock")) {
+	if (!enable_sensorhub_ws && !strcmp(ws->name, "ssp_sensorhub_wake_lock")) {
 		pr_info("wakeup source sensorhub activation skipped\n");
 		return;
 	}
 
-	if (!enable_ssp_wl && !strcmp(ws->name, "ssp_wake_lock")) {
+	if (!enable_ssp_ws && !strcmp(ws->name, "ssp_wake_lock")) {
 		pr_info("wakeup source ssp activation skipped\n");
 		return;
 	}
 
-	if (!enable_bcm4773_wl && !strcmp(ws->name, "bcm4773_wake_lock")) {
+	if (!enable_bcm4773_ws && !strcmp(ws->name, "bcm4773_wake_lock")) {
 		pr_info("wakeup source bcm4773 activation skipped\n");
 		return;
 	}
 
-	if (!enable_lli_pm_wl && !strcmp(ws->name, "lli_pm_wlock")) {
+	if (!enable_lli_pm_ws && !strcmp(ws->name, "lli_pm_wsock")) {
 		pr_info("wakeup source lli_pm activation skipped\n");
 		return;
 	}
 
-	if (!enable_radio_interface_wl && !strcmp(ws->name, "radio-interface")) {
+	if (!enable_radio_interface_ws && !strcmp(ws->name, "radio-interface")) {
 		pr_info("wakeup source radio-interface activation skipped\n");
 		return;
 	}
 
-	if (!enable_umts_ipc0_wl && !strcmp(ws->name, "umts_ipc0")) {
+	if (!enable_umts_ipc0_ws && !strcmp(ws->name, "umts_ipc0")) {
 		pr_info("wakeup source umts_ipc0 activation skipped\n");
 		return;
 	}
