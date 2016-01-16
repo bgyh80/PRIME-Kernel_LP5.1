@@ -27,6 +27,7 @@ static int enable_lli_pm_ws = 1;
 static int enable_radio_interface_ws = 1;
 static int enable_umts_ipc0_ws = 1;
 static int enable_power_manager_service_ws = 1;
+static int enable_alarm_ws = 1;
 module_param(enable_sensorhub_ws, int, 0644);
 module_param(enable_ssp_ws, int, 0644);
 module_param(enable_bcm4773_ws, int, 0644);
@@ -34,6 +35,7 @@ module_param(enable_lli_pm_ws, int, 0644);
 module_param(enable_radio_interface_ws, int, 0644);
 module_param(enable_umts_ipc0_ws, int, 0644);
 module_param(enable_power_manager_service_ws, int, 0644);
+module_param(enable_alarm_ws, int, 0644);
 
 /*
  * If set, the suspend/hibernate code will abort transitions to a sleep state
@@ -437,6 +439,11 @@ static void wakeup_source_activate(struct wakeup_source *ws)
 
 	if (!enable_power_manager_service_ws && !strcmp(ws->name, "PowerManagerService.WakeLocks")) {
 		pr_info("wakeup source PowerManagerService.WakeLocks activation skipped\n");
+		return;
+	}
+
+	if (!enable_alarm_ws && !strcmp(ws->name, "alarm")) {
+		pr_info("wakeup source alarm activation skipped\n");
 		return;
 	}
 
