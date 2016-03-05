@@ -20,8 +20,8 @@
 
 #include "mdnie.h"
 
-static int elable_toggle_negative = 1;
-module_param(elable_toggle_negative, int, 0644);
+static int enable_toggle_negative = 1;
+module_param(enable_toggle_negative, int, 0644);
 
 #define MDNIE_SYSFS_PREFIX		"/sdcard/mdnie/"
 #define PANEL_COORDINATE_PATH	"/sys/class/lcd/panel/color_coordinate"
@@ -408,7 +408,7 @@ static ssize_t accessibility_store(struct device *dev,
 //gm
 void mdnie_toggle_negative(void)
 {
-	if(!elable_toggle_negative) return;
+	if(!enable_toggle_negative) return;
 	
 	mutex_lock(&g_mdnie->lock);
 	g_mdnie->accessibility = !g_mdnie->accessibility;
