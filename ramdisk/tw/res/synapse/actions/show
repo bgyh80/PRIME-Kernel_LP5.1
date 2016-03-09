@@ -20,7 +20,7 @@ fast)
   ;;
 asv)
   getasv ARM "A57"
-  getasv KFC "A15"
+  getasv KFC "A53"
   getasv G3D "GPU"
   getasv MIF "Memory"
   getasv INT "Int Bus"
