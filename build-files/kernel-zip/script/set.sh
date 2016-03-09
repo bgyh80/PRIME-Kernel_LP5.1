@@ -33,13 +33,13 @@ $BB chown -R root.root /system/etc/init.d
 $BB chmod -R 0755 /system/etc/init.d-postboot
 $BB chown -R root.root /system/etc/init.d-postboot
 
-#if [ ! -e /system/xbin/busybox ]; then
-#	cp /tmp/script/busybox /system/xbin/busybox
-#	chmod 06755 /system/xbin/busybox;
-#fi;
-#for i in $(/system/xbin/busybox --list); do
-#    $BB ln -sf /system/xbin/busybox /system/xbin/$i
-#done
-
-#$BB ln -sf /sbin/uci /system/xbin/uci
-
+PKG_IGNORE=/data/media/0/Synapse/pakage_list_ignore.txt
+PKG_SYSTEM=/data/media/0/Synapse/pakage_list_system.txt
+PKG_GOOGLE=/data/media/0/Synapse/pakage_list_google.txt
+PKG_AVAIL=/data/media/0/Synapse/pakage_list.txt
+#if [ ! -e $PKG_LIST ]; then
+cp -f /tmp/script/pakage_list_ignore.txt $PKG_IGNORE
+cp -f /tmp/script/pakage_list_system.txt $PKG_SYSTEM
+cp -f /tmp/script/pakage_list_google.txt $PKG_GOOGLE
+cp -f /tmp/script/pakage_list.txt $PKG_AVAIL
+#fi
