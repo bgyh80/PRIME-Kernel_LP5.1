@@ -1,0 +1,9 @@
+#!/res/bin/busybox sh
+
+INC=/data/StockRider/bin/gametune.inc
+
+if [ -e $INC ]; then
+    source $INC
+else
+	echo 0;
+fi
