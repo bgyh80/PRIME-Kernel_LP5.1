@@ -180,7 +180,7 @@ static int find_fsync_dnodes(struct f2fs_sb_info *sbi, struct list_head *head)
 	curseg = CURSEG_I(sbi, CURSEG_WARM_NODE);
 	blkaddr = NEXT_FREE_BLKADDR(sbi, curseg);
 
-	ra_meta_pages(sbi, blkaddr, 1, META_POR, true);
+	ra_meta_pages(sbi, blkaddr, 1, META_POR);
 
 	while (1) {
 		struct fsync_inode_entry *entry;
@@ -188,7 +188,7 @@ static int find_fsync_dnodes(struct f2fs_sb_info *sbi, struct list_head *head)
 		if (!is_valid_blkaddr(sbi, blkaddr, META_POR))
 			return 0;
 
-		page = get_tmp_page(sbi, blkaddr);
+		page = get_meta_page(sbi, blkaddr);
 
 		if (cp_ver != cpver_of_node(page))
 			break;
@@ -383,11 +383,15 @@ static int do_recover_data(struct f2fs_sb_info *sbi, struct inode *inode,
 	start = start_bidx_of_node(ofs_of_node(page), fi);
 	end = start + ADDRS_PER_PAGE(page, fi);
 
+	f2fs_lock_op(sbi);
+
 	set_new_dnode(&dn, inode, NULL, NULL, 0);
 
 	err = get_dnode_of_data(&dn, start, ALLOC_NODE);
-	if (err)
+	if (err) {
+		f2fs_unlock_op(sbi);
 		goto out;
+	}
 
 	f2fs_wait_on_page_writeback(dn.node_page, NODE);
 
@@ -452,6 +456,7 @@ static int do_recover_data(struct f2fs_sb_info *sbi, struct inode *inode,
 	set_page_dirty(dn.node_page);
 err:
 	f2fs_put_dnode(&dn);
+	f2fs_unlock_op(sbi);
 out:
 	f2fs_msg(sbi->sb, KERN_NOTICE,
 		"recover_data: ino = %lx, recovered = %d blocks, err = %d",
@@ -480,7 +485,7 @@ static int recover_data(struct f2fs_sb_info *sbi,
 
 		ra_meta_pages_cond(sbi, blkaddr);
 
-		page = get_tmp_page(sbi, blkaddr);
+		page = get_meta_page(sbi, blkaddr);
 
 		if (cp_ver != cpver_of_node(page)) {
 			f2fs_put_page(page, 1);
@@ -565,7 +570,7 @@ out:
 
 	/* truncate meta pages to be used by the recovery */
 	truncate_inode_pages_range(META_MAPPING(sbi),
-			(loff_t)MAIN_BLKADDR(sbi) << PAGE_CACHE_SHIFT, -1);
+			MAIN_BLKADDR(sbi) << PAGE_CACHE_SHIFT, -1);
 
 	if (err) {
 		truncate_inode_pages(NODE_MAPPING(sbi), 0);
