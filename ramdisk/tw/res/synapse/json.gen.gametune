@@ -4,8 +4,22 @@ cat << CTAG
 {
 name:{en:"GameTuner MOD", ko: "게임튜너 MOD"},
 elements:[
-	{ SDescription:{
-		description:"선택한 애플리케이션이 게임튜너에 강제로 추가 됩니다.\n애플리케이션의 해상도를 중간(FHD) 이하로 낮추어 사용하면 UI 성능은 물론이고 배터리 절약에도 크게 도움이 됩니다."
+`
+  if [ ! -e /data/StockRider/bin/synapse_loader212 ]; then
+    echo '    { SPane:{
+	    title:"기부하신 후 사용할 수 있는 기능입니다.",
+		description:"기부하신 분들께 제공되는 혜택입니다.\n기부는 간접적인 개발 참여 방법입니다.\n이 커널이 꾸준히 업데이트 되길 원한다면 기부에 동참해보세요.\n",
+    }},
+	{ SButton:{
+		label:"기부로 개발에 동참하기",
+		action:"am start -a android.intent.action.VIEW -d http://enfree.com/stockrider/?page=donate > /dev/null 2>&1 & echo '     웹브라우저를 실행합니다.     '"
+	}},
+	{ SSpacer:{ height:2 }},'
+  fi
+`
+	{ SPane:{
+		title:{en:"GameTuner MOD", ko:"게임튜너 MOD"},
+		description:"선택한 애플리케이션들이 게임튜너에 강제로 추가 됩니다.\n애플리케이션의 해상도를 중간(FHD) 이하로 낮추어 사용하면 UI 성능은 물론이고 배터리 절약에도 크게 도움이 됩니다."
 	}},
 	{ SSpacer:{height:1}},
 
