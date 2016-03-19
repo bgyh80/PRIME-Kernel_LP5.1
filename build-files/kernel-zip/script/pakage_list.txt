@@ -130,7 +130,7 @@ com.ahnlab.v3mobileplus=V3 Mobile Plus
 com.dencreak.dlcalculator=실생활계산기
 nh.smart=NH뱅킹
 com.nxc.catchitenglishbasic.google=캐치잇통합팩
-
+com.ss.launcher2=토탈런처
 
 #---- New Auto Generate ---------------------------------
 

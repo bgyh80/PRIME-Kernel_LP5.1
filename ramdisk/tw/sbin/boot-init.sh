@@ -77,7 +77,6 @@ if [ -e /sys/block/zram0 ]; then
 		echo lz4 > $i/comp_algorithm
     done;
 fi;
-
 echo 0 > /sys/devices/14ac0000.mali/dvfs_governor
 echo Y > /sys/module/mmc_core/parameters/use_spi_crc
 echo 0 > /sys/kernel/dyn_fsync/Dyn_fsync_active
@@ -91,6 +90,7 @@ echo 700000 > /sys/devices/system/cpu/cpu4/cpufreq/scaling_min_freq
 echo 1900000 > /sys/devices/system/cpu/cpu4/cpufreq/scaling_max_freq
 echo 70 > /sys/module/zswap/parameters/max_pool_percent
 echo 40960 > /sys/module/lowmemorykiller/parameters/vmpressure_file_min
+echo 0 > /sys/module/mdnie_lite/parameters/enable_toggle_negative
 
 cpuvoltTable=/sys/devices/system/cpu/cpufreq/mp-cpufreq/cpu_volt_table
 $BB chmod 666 $cpuvoltTable

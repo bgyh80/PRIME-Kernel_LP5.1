@@ -82,12 +82,13 @@ if [ -e $_DB ]; then
 		rt=( \`echo $result|bb sed "s/|/ /g"\` )
 		if [ ${#rt[@]} -gt 1 -a "${rt[1]}" != "DQ" ]; then
 			continue
-		fi	
+		else
+			ret_name="\`$action/gametune_name $KEY\`"
+		fi
 	done < $_LIST
 	rm  $_LIST
 fi
-_LIST="/data/media/0/Synapse/pakage_list.txt"
-if [ -e $_LIST ]; then
+if [ -e $_LOCAL_LIST ]; then
 	while read LINE
 	do
 		LINE=${LINE##\#*}
@@ -98,8 +99,8 @@ if [ -e $_LIST ]; then
 		ret_name="\`$action/gametune_name $PACKAGE\`"
 		if [ ! -z "$ret_name" -a -d /data/data/$PACKAGE ]; then
 			echo "{SCheckBox:{label:\"$TITLE\", default:0, action:\"gametune $PACKAGE\"}},"
-		fi
-	done < $_LIST
+ 		fi
+ 	done < $_LOCAL_LIST
 fi
 `
     { SSpacer:{height:2}},

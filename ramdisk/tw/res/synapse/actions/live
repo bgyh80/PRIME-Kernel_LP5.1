@@ -260,7 +260,7 @@ donate)
     	fi
     else
         echo "기부 애드온이 설치되지 않았습니다.@n"
-        echo "유틸리티 탭의 모든 기능은 기부 애드온을 필요로 합니다."
+        echo "일부 기능은 기부 애드온을 필요로 합니다."
     fi
   ;;
 profile_latest)
